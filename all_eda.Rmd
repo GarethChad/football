@@ -1,0 +1,365 @@
+---
+title: "Exploratory Data Analysis for 5 Football Leagues"
+output: html_notebook
+---
+
+Exploratory data analysis for English, German, Spanish, Italian and French results combined.  
+
+
+```{r Initialise and Load Data, include=FALSE}
+rm(list = ls())
+
+library(tidyverse)
+library(gridExtra)
+
+load(here::here("data/interim/En_features.RData"))
+load(here::here("data/interim/De_features.RData"))
+load(here::here("data/interim/Sp_features.RData"))
+load(here::here("data/interim/It_features.RData"))
+load(here::here("data/interim/Fr_features.RData"))
+
+En_features$country <- "eng"
+De_features$country <- "ger"
+Sp_features$country <- "spa"
+It_features$country <- "ita"
+Fr_features$country <- "fra"
+
+all_features <- bind_rows(En_features, De_features, Sp_features, It_features, Fr_features)
+rm(En_features, De_features, Sp_features, It_features, Fr_features)
+```
+
+```{r Function definition, include=FALSE}
+two_var_plot <- function(df, var){
+  
+  new_var <- enquo(var)
+  
+  plot_df <- df %>%
+    mutate(var_bin = cut(!!new_var, breaks = 10)) %>%
+    group_by(var_bin) %>%
+    summarise(prop_aways = mean(AwayWin),
+              num_bin = n())
+  
+  var_string <- deparse(substitute(var))
+  
+  plot <- ggplot(plot_df, aes(var_bin, prop_aways, group = 1)) + geom_line() + geom_point(aes(size = num_bin)) +
+    theme_bw() + labs(x = paste0("Bin for ", var_string), y = "Proportion Away Wins") + 
+    theme(axis.text.x  = element_text(angle=90))
+  
+  return(plot)
+}
+```
+
+
+##Summary of All Variables
+
+```{r Data Summary}
+summary(all_features %>% select(HS, HST, HC, HF, HY, HomexG, Dist, winpc_H, top6_perfH))
+```
+
+```{r Plot Histograms, echo=FALSE, fig.height=8, message=FALSE, warning=FALSE}
+plot_1 <- ggplot(all_features, aes(HS)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_2 <- ggplot(all_features, aes(HST)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_3 <- ggplot(all_features, aes(HC)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_4 <- ggplot(all_features, aes(HF)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_5 <- ggplot(all_features, aes(HY)) + geom_histogram(fill = "white", colour = "black") + theme_minimal()
+plot_6 <- ggplot(all_features, aes(HomexG)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_7 <- ggplot(all_features, aes(Dist)) + geom_histogram(fill = "white", colour = "black") + theme_minimal()
+plot_8 <- ggplot(all_features, aes(winpc_H)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_9 <- ggplot(all_features, aes(top6_perfH)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+
+grid_plot1 <- arrangeGrob(plot_1, plot_2, plot_3, plot_4, plot_5, plot_6, plot_7, plot_8, plot_9, 
+             ncol = 2)
+ggsave(here::here("plots/eda_grid_plot1.png"), grid_plot1)
+knitr::include_graphics(here::here("plots/eda_grid_plot1.png"))
+
+```
+
+No feature transformations are deemed to be necessary.  
+
+##Creation of Additional Features
+To reflect the under- or over-preformance of a team, compared with the quality of chances created, new features are derived.  These are **Taken Chance = Goals Scored / xG** and **Defended Chance = Opposition xG / Goals Conceded**.  
+
+* LastHTC means Last Home Taken Chance
+* LastHDC means Last Home Defended Chance  
+
+To remove zeros, an offset of +1 is applied to both Goals Scored and xG values.  
+
+
+```{r New Features for xG, echo=FALSE, message=FALSE, warning=FALSE}
+
+goal_offset <- 1
+all_features <- all_features %>%
+  mutate(LastHTC1 = (LastHGS1 + goal_offset) / (LastHxG1 + goal_offset),
+         LastHDC1 = (LastHoppxG1 + goal_offset) / (LastHGC1 + goal_offset),
+         LastATC1 = (LastAGS1 + goal_offset) / (LastAxG1 + goal_offset),
+         LastADC1 = (LastAoppxG1 + goal_offset) / (LastAGC1 + goal_offset),
+         LastHTC2 = (LastHGS2 + goal_offset) / (LastHxG2 + goal_offset),
+         LastHDC2 = (LastHoppxG2 + goal_offset) / (LastHGC2 + goal_offset),
+         LastATC2 = (LastAGS2 + goal_offset) / (LastAxG2 + goal_offset),
+         LastADC2 = (LastAoppxG2 + goal_offset) / (LastAGC2 + goal_offset),
+         LastHTC3 = (LastHGS3 + goal_offset) / (LastHxG3 + goal_offset),
+         LastHDC3 = (LastHoppxG3 + goal_offset) / (LastHGC3 + goal_offset),
+         LastATC3 = (LastAGS3 + goal_offset) / (LastAxG3 + goal_offset),
+         LastADC3 = (LastAoppxG3 + goal_offset) / (LastAGC3 + goal_offset),
+         LastHTC4 = (LastHGS4 + goal_offset) / (LastHxG4 + goal_offset),
+         LastHDC4 = (LastHoppxG4 + goal_offset) / (LastHGC4 + goal_offset),
+         LastATC4 = (LastAGS4 + goal_offset) / (LastAxG4 + goal_offset),
+         LastADC4 = (LastAoppxG4 + goal_offset) / (LastAGC4 + goal_offset))
+
+all_features$LastHTC1[which(all_features$LastHTC1 > 10)] <- 10
+all_features$LastHTC2[which(all_features$LastHTC2 > 10)] <- 10
+all_features$LastHTC3[which(all_features$LastHTC3 > 10)] <- 10
+all_features$LastHTC4[which(all_features$LastHTC4 > 10)] <- 10
+all_features$LastATC1[which(all_features$LastATC1 > 10)] <- 10
+all_features$LastATC2[which(all_features$LastATC2 > 10)] <- 10
+all_features$LastATC3[which(all_features$LastATC3 > 10)] <- 10
+all_features$LastATC4[which(all_features$LastATC4 > 10)] <- 10
+
+all_features$LastHDC1[which(all_features$LastHDC1 > 10)] <- 10
+all_features$LastHDC2[which(all_features$LastHDC2 > 10)] <- 10
+all_features$LastHDC3[which(all_features$LastHDC3 > 10)] <- 10
+all_features$LastHDC4[which(all_features$LastHDC4 > 10)] <- 10
+all_features$LastADC1[which(all_features$LastADC1 > 10)] <- 10
+all_features$LastADC2[which(all_features$LastADC2 > 10)] <- 10
+all_features$LastADC3[which(all_features$LastADC3 > 10)] <- 10
+all_features$LastADC4[which(all_features$LastADC4 > 10)] <- 10
+
+# add month
+all_features$month <- factor(format(all_features$Date, "%B"), 
+                            levels = c("September", "October", "November", "December", "January", "February",
+                                       "March", "April", "May"))
+
+# dummy vars for Home team
+# all_features <- fastDummies::dummy_cols(all_features, select_columns = "HomeTeam")
+
+plot_1 <- ggplot(all_features, aes(LastHTC1)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_2 <- ggplot(all_features, aes(LastHDC1)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+
+grid_plot2 <- arrangeGrob(plot_1, plot_2, ncol = 2)
+ggsave(here::here("plots/eda_grid_plot2.png"), grid_plot2, height = 5)
+knitr::include_graphics(here::here("plots/eda_grid_plot2.png"))
+
+```
+
+These features will be log transformed.
+
+```{r Log Transformation, echo=FALSE, message=FALSE, warning=FALSE}
+all_features <- all_features %>%
+  mutate(log_LastHTC1 = log(LastHTC1),
+         log_LastHDC1 = log(LastHDC1),
+         log_LastATC1 = log(LastATC1),
+         log_LastADC1 = log(LastADC1),
+         log_LastHTC2 = log(LastHTC2),
+         log_LastHDC2 = log(LastHDC2),
+         log_LastATC2 = log(LastATC2),
+         log_LastADC2 = log(LastADC2),
+         log_LastHTC3 = log(LastHTC3),
+         log_LastHDC3 = log(LastHDC3),
+         log_LastATC3 = log(LastATC3),
+         log_LastADC3 = log(LastADC3),
+         log_LastHTC4 = log(LastHTC4),
+         log_LastHDC4 = log(LastHDC4),
+         log_LastATC4 = log(LastATC4),
+         log_LastADC4 = log(LastADC4))
+
+plot_1 <- ggplot(all_features, aes(log_LastHTC1)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+plot_2 <- ggplot(all_features, aes(log_LastHDC1)) + geom_density(fill = "white", colour = "black") + theme_minimal()
+
+grid_plot3 <- arrangeGrob(plot_1, plot_2, ncol = 2)
+ggsave(here::here("plots/eda_grid_plot3.png"), grid_plot3, height = 5)
+knitr::include_graphics(here::here("plots/eda_grid_plot3.png"))
+
+```
+
+
+##Feature Correlations
+A plot to demonstrate how much correlation is observed between feature variables. Just comparing Home variables for last game.  
+
+
+```{r Feature Correlation, echo=FALSE, message=FALSE, warning=FALSE}
+corr <- cor(all_features[, c(3:7, 9:14, 16, 18:19, 169, 171, 173:177, 180:181, 200:201)], use = "pairwise.complete.obs")
+
+limit <- 0.65
+keep_vec <- numeric()
+
+# remove all variables with only low correlation
+for (i in 1:ncol(corr)){
+  corr[i, i] <- 0
+  if (any(abs(corr[, i]) > limit)){
+    keep_vec[length(keep_vec) + 1] <- i
+  }
+}
+
+reduced_corr <- corr[keep_vec, keep_vec]
+
+corr_plot <- ggcorrplot::ggcorrplot(reduced_corr, type = "lower", lab = TRUE)
+ggsave(here::here("plots/eda_corr_plot.png"), corr_plot, width = 10)
+knitr::include_graphics(here::here("plots/eda_corr_plot.png"), dpi = 200)
+```
+
+This plot shows that:  
+
+ * win percentage is highly inversely correlated to table position -> just keep win percentage
+ * goals scored correlated with taken chances, however does give additional information so will keep both for now
+ * goals conceded inversely correlated with defended chances, however gives additional information so will keep both for now
+ * shots, shots on target and xG, both for and against somewhat correlated with each other -> have a lot of shots data and not much xG data, so perhaps just keep both shots and shots on target for now
+ 
+##Focus on High Odds Aways  
+Looking for predictive value, we are trying to predict Away wins where odds are somewhat high.  We will filter the data to only investigate games where Away odds > 3.
+ 
+```{r Filter Data by Odds and Summarise Away Wins, echo=FALSE, message=FALSE, warning=FALSE}
+High_odds <- all_features %>%
+  filter(BbAvA > 3) %>%
+  mutate(Season = index %/% 1000)
+
+cat("overall:")
+table(High_odds$AwayWin)
+
+cat("\nby season:")
+tbl_data <- as_tibble(table(High_odds$Season, High_odds$AwayWin), .name_repair = "unique")
+names(tbl_data)[1] <- "season"
+names(tbl_data)[2] <- "result"
+
+tbl_data <- tbl_data %>%
+  pivot_wider(names_from = result, names_prefix = "AwayWin_", values_from = n) %>%
+  mutate(prop_Away = AwayWin_1 / (AwayWin_0 + AwayWin_1),
+         season = as.numeric(season))
+
+print(tbl_data)
+
+season_plot <- ggplot(tbl_data, aes(season, prop_Away, group = 1)) + geom_line() + geom_point() +
+  theme_bw() + scale_y_continuous(labels = scales::percent) + 
+  labs(x = "Season", y = "Proportion Away Wins for High Odds Games")
+
+ggsave(here::here("plots/season_plot.png"), season_plot, height = 5)
+knitr::include_graphics(here::here("plots/season_plot.png"), dpi = 200)
+
+```
+ 
+Therefore, approximately 18% of these games are Away wins. We have 62% of games that have high Away odds.  The proprtion of these that are Away wins varies from ~14-21% by season and trend may be increasing.  
+ 
+##Two Variable Plots  
+
+Plots to illustrate how each variable individually affects the outcome.  
+
+```{r Two Variable Plots, echo=FALSE, message=FALSE, warning=FALSE}
+winpc_H_plot <- two_var_plot(High_odds, winpc_H)
+winpc_A_plot <- two_var_plot(High_odds, winpc_A)
+top6_perfH_plot <- two_var_plot(High_odds, top6_perfH)
+top6_perfA_plot <- two_var_plot(High_odds, top6_perfA)
+
+HomeFin_plot <- two_var_plot(High_odds, HomeFin1)
+AwayFin_plot <- two_var_plot(High_odds, AwayFin1)
+Dist_plot <- two_var_plot(High_odds, Dist)
+
+LastHST_plot <- two_var_plot(High_odds, LastHST1)
+LastHF_plot <- two_var_plot(High_odds, LastHF1)
+LastHC_plot <- two_var_plot(High_odds, LastHC1)
+# LastHTC_plot <- two_var_plot(High_odds, log_LastHTC1)
+# LastHDC_plot <- two_var_plot(High_odds, log_LastHDC1)
+# LastHxG_plot <- two_var_plot(High_odds, LastHxG1)
+# LastHoppxG_plot <- two_var_plot(High_odds, LastHoppxG1)
+LastHGS_plot <- two_var_plot(High_odds, LastHGS1)
+LastHGC_plot <- two_var_plot(High_odds, LastHGC1)
+
+LastAST_plot <- two_var_plot(High_odds, LastAST1)
+LastAF_plot <- two_var_plot(High_odds, LastAF1)
+LastAC_plot <- two_var_plot(High_odds, LastAC1)
+# LastATC_plot <- two_var_plot(High_odds, log_LastATC1)
+# LastADC_plot <- two_var_plot(High_odds, log_LastADC1)
+# LastAxG_plot <- two_var_plot(High_odds, LastAxG1)
+# LastAoppxG_plot <- two_var_plot(High_odds, LastAoppxG1)
+LastAGS_plot <- two_var_plot(High_odds, LastAGS1)
+LastAGC_plot <- two_var_plot(High_odds, LastAGC1)
+
+month_df <- High_odds %>%
+  filter(is.na(month) == FALSE) %>%
+  group_by(month) %>%
+  summarise(prop_aways = mean(AwayWin),
+              num_bin = n())
+
+month_plot <- ggplot(month_df, aes(month, prop_aways, group = 1)) + geom_line() + geom_point(aes(size = num_bin)) +
+    theme_bw() + labs(x = "Month", y = "Proportion Away Wins") + 
+    theme(axis.text.x  = element_text(angle=90))
+
+grid_plot4 <- arrangeGrob(winpc_H_plot, winpc_A_plot, top6_perfH_plot, top6_perfA_plot, HomeFin_plot, AwayFin_plot, 
+                       Dist_plot, month_plot, LastHST_plot, LastHF_plot, LastHC_plot, LastHGS_plot, LastHGC_plot, 
+                       LastAGS_plot, LastAGC_plot, LastAST_plot, LastAF_plot, LastAC_plot, ncol = 2)
+
+ggsave(here::here("plots/eda_grid_plot4.png"), grid_plot4, height = 36, width = 10)
+knitr::include_graphics(here::here("plots/eda_grid_plot4.png"), dpi = 200)
+
+```
+
+ Conclusions on relationship with Away Win proportion that we can draw from these:  
+ 
+ * Clear relationships with Home win percentage and Home performance against top 6, but much weaker for Away  
+ * Last Home Finish highly correlated up to bottom of table finish then reverses at about 18th; Away Finish relationship weaker 
+ * Last Home shots on target, corners, goals scored, fouls, goals conceded, have some relationship
+ * Last Away shots on target has some relationship   
+ * Distance relationship is unclear
+ * Some variability with Month - higher proportion for Sep, Nov and Mar
+ 
+ So we'll take the following forward:
+ 
+ * winpc_H, winpc_A
+ * top6_perfH, top6_perfA
+ * HomeFin, AwayFin
+ * Month
+ * LastHST1-4, LastHC1-4, LastHGS1-4, LastHF1-4 and LastHGC1-4
+ * LastAST1-4
+
+ However, how do summed variables compare?
+ 
+```{r Summed Features, echo=FALSE, message=FALSE, warning=FALSE}
+High_odds <- High_odds %>%
+  mutate(sum_HST = LastHST1 + LastHST2 + LastHST3 + LastHST4,
+         sum_HC = LastHC1 + LastHC2 + LastHC3 + LastHC4,
+         sum_HF = LastHF1 + LastHF2 + LastHF3 + LastHF4,
+         sum_HGS = LastHGS1 + LastHGS2 + LastHGS3 + LastHGS4,
+         sum_HGC = LastHGC1 + LastHGC2 + LastHGC3 + LastHGC4,
+         # sum_HxG = LastHxG1 + LastHxG2 + LastHxG3 + LastHxG4,
+         # sum_HTC = log_LastHTC1 + log_LastHTC2 + log_LastHTC3 + log_LastHTC4,
+         # sum_HDC = log_LastHDC1 + log_LastHDC2 + log_LastHDC3 + log_LastHDC4,
+         sum_AST = LastAST1 + LastAST2 + LastAST3 + LastAST4,
+         sum_AC = LastAC1 + LastAC2 + LastAC3 + LastAC4,
+         sum_AF = LastAF1 + LastAF2 + LastAF3 + LastAF4,
+         sum_AGS = LastAGS1 + LastAGS2 + LastAGS3 + LastAGS4,
+         sum_AGC = LastAGC1 + LastAGC2 + LastAGC3 + LastAGC4)
+         # sum_AxG = LastAxG1 + LastAxG2 + LastAxG3 + LastAxG4,
+         # sum_ATC = log_LastATC1 + log_LastATC2 + log_LastATC3 + log_LastATC4,
+         # sum_ADC = log_LastADC1 + log_LastADC2 + log_LastADC3 + log_LastADC4)
+
+sumHST_plot <- two_var_plot(High_odds, sum_HST)
+sumHC_plot <- two_var_plot(High_odds, sum_HC)
+sumHF_plot <- two_var_plot(High_odds, sum_HF)
+sumHGC_plot <- two_var_plot(High_odds, sum_HGC)
+sumHGS_plot <- two_var_plot(High_odds, sum_HGS)
+# sumHxG_plot <- two_var_plot(High_odds, sum_HxG)
+# sumHTC_plot <- two_var_plot(High_odds, sum_HTC)
+# sumHDC_plot <- two_var_plot(High_odds, sum_HDC)
+sumAST_plot <- two_var_plot(High_odds, sum_AST)
+sumAC_plot <- two_var_plot(High_odds, sum_AC)
+sumAF_plot <- two_var_plot(High_odds, sum_AF)
+sumAGC_plot <- two_var_plot(High_odds, sum_AGC)
+sumAGS_plot <- two_var_plot(High_odds, sum_AGS)
+# sumAxG_plot <- two_var_plot(High_odds, sum_AxG)
+# sumATC_plot <- two_var_plot(High_odds, sum_ATC)
+# sumADC_plot <- two_var_plot(High_odds, sum_ADC)
+
+grid_plot5 <- arrangeGrob(sumHST_plot, sumHC_plot, sumHF_plot, sumHGS_plot, sumHGC_plot, sumAGS_plot, 
+                          sumAGC_plot, sumAST_plot, sumAC_plot, sumAF_plot, ncol = 2)
+
+ggsave(here::here("plots/eda_grid_plot5.png"), grid_plot5, height = 15, width = 10)
+knitr::include_graphics(here::here("plots/eda_grid_plot5.png"), dpi = 200)
+
+```
+ 
+ This additional data suggests:
+ 
+ * sum_HST, sum_HC, sum_HF, sum_HGS, sum_HGC are useful
+ * sum_AST may be useful
+ * others are marginal or not useful
+
+ Perhaps the summed variables will actually perform better.
+ 
